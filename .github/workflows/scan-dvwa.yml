@@ -1,0 +1,114 @@
+name: DVWA + Qodo + Metis Scans
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------
+      # 1. Install Dependencies (jq, curl, python)
+      # ----------------------------------------------------------
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # ----------------------------------------------------------
+      # 2. Install Qodo CLI (replace with your internal installer)
+      # ----------------------------------------------------------
+
+      - name: Install Qodo CLI
+        run: |
+          echo "Installing Qodo CLI..."
+          # Replace with your actual install command:
+          # curl -sSL https://qodo-install-url | bash
+          echo "Qodo installation placeholder. Replace me."
+
+      # ----------------------------------------------------------
+      # 3. Install Metis CLI (replace with actual installer)
+      # ----------------------------------------------------------
+
+      - name: Install Metis CLI
+        run: |
+          echo "Installing Metis CLI..."
+          # Replace this with actual:
+          # curl -sSL https://metis-install-url | bash
+          echo "Metis installation placeholder. Replace me."
+
+      # ----------------------------------------------------------
+      # 4. Start DVWA via docker-compose
+      # ----------------------------------------------------------
+
+      - name: Start DVWA (Docker Compose)
+        working-directory: dvwa
+        run: docker compose up -d
+
+      - name: Wait for DVWA to be reachable
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost | grep -qi "DVWA"; then
+              echo "DVWA is up!"
+              exit 0
+            fi
+            echo "Waiting for DVWA..."
+            sleep 5
+          done
+          echo "DVWA did not start in time."
+          exit 1
+
+      # ----------------------------------------------------------
+      # 5. Run Qodo Scan
+      # ----------------------------------------------------------
+
+      - name: Run Qodo Scan
+        run: |
+          qodo scan http://localhost \
+            --format json \
+            --output qodo-result.json || true
+
+      # ----------------------------------------------------------
+      # 6. Run Metis Scan
+      # ----------------------------------------------------------
+
+      - name: Run Metis Scan
+        run: |
+          metis scan --url http://localhost --json > metis-result.json || true
+
+      # ----------------------------------------------------------
+      # 7. Normalize JSON for comparison
+      # ----------------------------------------------------------
+
+      - name: Sort JSON outputs
+        run: |
+          jq -S . qodo-result.json > qodo-sorted.json || true
+          jq -S . metis-result.json > metis-sorted.json || true
+
+      # ----------------------------------------------------------
+      # 8. Diff Results
+      # ----------------------------------------------------------
+
+      - name: Compare Qodo vs Metis
+        run: |
+          echo "===== DIFF OUTPUT ====="
+          diff qodo-sorted.json metis-sorted.json || true
+
+      # ----------------------------------------------------------
+      # 9. Upload artifacts
+      # ----------------------------------------------------------
+
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results
+          path: |
+            qodo-result.json
+            metis-result.json
+            qodo-sorted.json
+            metis-sorted.json
