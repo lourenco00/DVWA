@@ -36,31 +36,25 @@ jobs:
 
       - name: Wait for DVWA
         run: |
-          for i in {1..30}; do
-            if curl -s http://localhost | grep -qi "DVWA"; then
-              echo "DVWA UP"
+          for i in {1..40}; do
+            if curl -s http://127.0.0.1:4280 | grep -qi "DVWA"; then
+              echo "DVWA is UP!"
               exit 0
             fi
             echo "Waiting..."
             sleep 5
           done
+          echo "DVWA failed to start"
           exit 1
 
-      # ------------------------------
-      # Qodo Scan
-      # ------------------------------
       - name: Run Qodo Scan
         run: |
-          echo "Running Qodo..."
-          qodo scan http://localhost --format json --output qodo.json || true
+          qodo scan http://127.0.0.1:4280 --format json --output qodo.json || true
 
-      # ------------------------------
-      # Metis Scan
-      # ------------------------------
       - name: Run Metis Scan
         run: |
-          echo "Running Metis..."
-          metis scan --url http://localhost --json > metis.json || true
+          metis scan --url http://127.0.0.1:4280 --json > metis.json || true
+
 
       # ------------------------------
       # Normalize JSON
