@@ -20,7 +20,7 @@ jobs:
 
       - name: Install Qodo.ai CLI
         run: |
-          pip install qodo
+          curl -fsSL https://get.qodo.ai/install.sh | bash
           qodo --help
 
       - name: Install Metis CLI
