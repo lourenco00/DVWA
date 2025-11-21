@@ -3,7 +3,7 @@ name: Vulnerable Action
 on:
   push:
     branches:
-      - master
+      - dev
 
 jobs:
   run_commands:

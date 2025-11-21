@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [dev]
   pull_request:
-    branches: [master]
+    branches: [dev]
   schedule:
     # Every Sunday at 0AM UTC
     - cron: "0 0 * * 0"
