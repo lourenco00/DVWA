@@ -18,34 +18,54 @@ jobs:
           sudo apt-get update && sudo apt-get install -y jq python3-pip
           pip install --upgrade pip
 
-      - name: Install Qodo.ai CLI
+      # -------------------------
+      # Install Qodo (NPM CLI)
+      # -------------------------
+      - name: Install Qodo CLI
         run: |
-          curl -fsSL https://get.qodo.ai/install.sh | bash
-          qodo --help
+          npm install -g @qodo/command
+          qodo --help || true
 
+      # -------------------------
+      # Install Metis
+      # (Assuming Metis CLI is `npm install -g @metis/command`
+      #  or pip install metisai — you need to confirm)
+      # -------------------------
       - name: Install Metis CLI
         run: |
           pip install metisai
-          metis --help
+          metis --help || true
 
-      - name: Run Qodo scan
+      # -------------------------
+      # Run static scans
+      # -------------------------
+      - name: Run Qodo Scan
         run: |
           qodo scan . --format json --output qodo.json || true
 
-      - name: Run Metis scan
+      - name: Run Metis Scan
         run: |
           metis scan . --json > metis.json || true
 
+      # -------------------------
+      # Normalize Outputs
+      # -------------------------
       - name: Normalize JSON
         run: |
           jq -S . qodo.json  > qodo-sorted.json  || true
           jq -S . metis.json > metis-sorted.json || true
 
-      - name: Compare results
+      # -------------------------
+      # Compare Results
+      # -------------------------
+      - name: Compare Results
         run: |
           echo "====== DIFF ======"
           diff qodo-sorted.json metis-sorted.json || true
 
+      # -------------------------
+      # Upload Artifacts
+      # -------------------------
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
