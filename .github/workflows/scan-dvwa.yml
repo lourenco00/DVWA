@@ -8,64 +8,86 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    env:
+      QODO_API_KEY: ${{ secrets.QODO_APIKEY }}
 
     steps:
+      # -----------------------------
+      # Checkout
+      # -----------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      # -----------------------------
+      # Dependencies
+      # -----------------------------
+      - name: Install system dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y jq python3-pip
+          sudo apt-get update
+          sudo apt-get install -y jq python3-pip npm git
           pip install --upgrade pip
 
-      # -------------------------
-      # Install Qodo (NPM CLI)
-      # -------------------------
+      # -----------------------------
+      # Install Qodo CLI (NPM)
+      # -----------------------------
       - name: Install Qodo CLI
         run: |
           npm install -g @qodo/command
           qodo --help || true
 
-      # -------------------------
-      # Install Metis
-      # (Assuming Metis CLI is `npm install -g @metis/command`
-      #  or pip install metisai — you need to confirm)
-      # -------------------------
+      # -----------------------------
+      # Install Metis (ARM GitHub repo)
+      # -----------------------------
       - name: Install Metis CLI
         run: |
-          pip install metisai
-          metis --help || true
+          git clone https://github.com/arm/metis.git
+          cd metis
+          pip install . --user
+          cd ..
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          which metis || true
 
-      # -------------------------
-      # Run static scans
-      # -------------------------
+      # -----------------------------
+      # Run Qodo Scan
+      # -----------------------------
       - name: Run Qodo Scan
         run: |
-          qodo scan . --format json --output qodo.json || true
+          qodo scan . \
+            --format json \
+            --output qodo.json \
+            || true
 
+      # -----------------------------
+      # Run Metis Scan
+      # -----------------------------
       - name: Run Metis Scan
         run: |
-          metis scan . --json > metis.json || true
+          metis \
+            --non-interactive \
+            --command "review_code" \
+            --codebase-path "." \
+            --output-file "metis.json" \
+            || true
 
-      # -------------------------
-      # Normalize Outputs
-      # -------------------------
+      # -----------------------------
+      # Normalize JSON
+      # -----------------------------
       - name: Normalize JSON
         run: |
           jq -S . qodo.json  > qodo-sorted.json  || true
           jq -S . metis.json > metis-sorted.json || true
 
-      # -------------------------
-      # Compare Results
-      # -------------------------
+      # -----------------------------
+      # Compare outputs
+      # -----------------------------
       - name: Compare Results
         run: |
           echo "====== DIFF ======"
           diff qodo-sorted.json metis-sorted.json || true
 
-      # -------------------------
-      # Upload Artifacts
-      # -------------------------
+      # -----------------------------
+      # Upload artifacts
+      # -----------------------------
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
