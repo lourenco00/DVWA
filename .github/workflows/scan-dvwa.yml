@@ -8,9 +8,9 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-
     env:
       QODO_API_KEY: ${{ secrets.QODO_APIKEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout repo
@@ -22,78 +22,52 @@ jobs:
           sudo apt-get install -y jq python3-pip npm git
           pip install --upgrade pip
 
-      # -----------------------------
-      # Install Qodo CLI
-      # -----------------------------
       - name: Install Qodo CLI
         run: |
           npm install -g @qodo/command
           qodo --help || true
 
-      # -----------------------------
-      # Install ARM Metis
-      # -----------------------------
       - name: Install Metis CLI
         run: |
           git clone https://github.com/arm/metis.git
           cd metis
-          pip install -r requirements.txt --user
           pip install . --user
           cd ..
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           which metis || true
 
-      # -----------------------------
-      # Run Qodo scan
-      # -----------------------------
       - name: Run Qodo Scan
         run: |
-          echo "Running Qodo..."
           qodo scan . \
             --format json \
             --output qodo.json \
             --ci \
-            || true
+          || true
+          echo "=== Qodo output ==="
+          cat qodo.json || echo "qodo.json missing"
 
-          echo "Qodo scan output:"
-          cat qodo.json || echo "No qodo.json found"
-
-      # -----------------------------
-      # Run Metis scan
-      # -----------------------------
       - name: Run Metis Scan
         run: |
-          echo "Running Metis..."
           metis \
             --non-interactive \
             --command "review_code" \
             --codebase-path "." \
             --output-file "metis.json" \
-            || true
+          || true
+          echo "=== Metis output ==="
+          cat metis.json || echo "metis.json missing"
 
-          echo "Metis scan output:"
-          cat metis.json || echo "No metis.json found"
-
-      # -----------------------------
-      # Normalize JSON files
-      # -----------------------------
       - name: Normalize JSON
         run: |
           jq -S . qodo.json  > qodo-sorted.json  || echo "{}" > qodo-sorted.json
           jq -S . metis.json > metis-sorted.json || echo "{}" > metis-sorted.json
 
-      # -----------------------------
-      # Diff Output
-      # -----------------------------
       - name: Compare Results
         run: |
-          echo "======== DIFF ========"
+          echo "====== DIFF ======"
           diff -u qodo-sorted.json metis-sorted.json || true
-          echo "========================"
+          echo "=================="
 
-      # -----------------------------
-      # Upload artifacts
-      # -----------------------------
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
