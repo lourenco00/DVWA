@@ -8,27 +8,22 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     env:
       QODO_API_KEY: ${{ secrets.QODO_APIKEY }}
 
     steps:
-      # -----------------------------
-      # Checkout
-      # -----------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # Dependencies
-      # -----------------------------
-      - name: Install system dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq python3-pip npm git
           pip install --upgrade pip
 
       # -----------------------------
-      # Install Qodo CLI (NPM)
+      # Install Qodo CLI
       # -----------------------------
       - name: Install Qodo CLI
         run: |
@@ -36,32 +31,39 @@ jobs:
           qodo --help || true
 
       # -----------------------------
-      # Install Metis (ARM GitHub repo)
+      # Install ARM Metis
       # -----------------------------
       - name: Install Metis CLI
         run: |
           git clone https://github.com/arm/metis.git
           cd metis
+          pip install -r requirements.txt --user
           pip install . --user
           cd ..
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           which metis || true
 
       # -----------------------------
-      # Run Qodo Scan
+      # Run Qodo scan
       # -----------------------------
       - name: Run Qodo Scan
         run: |
+          echo "Running Qodo..."
           qodo scan . \
             --format json \
             --output qodo.json \
+            --ci \
             || true
 
+          echo "Qodo scan output:"
+          cat qodo.json || echo "No qodo.json found"
+
       # -----------------------------
-      # Run Metis Scan
+      # Run Metis scan
       # -----------------------------
       - name: Run Metis Scan
         run: |
+          echo "Running Metis..."
           metis \
             --non-interactive \
             --command "review_code" \
@@ -69,21 +71,25 @@ jobs:
             --output-file "metis.json" \
             || true
 
+          echo "Metis scan output:"
+          cat metis.json || echo "No metis.json found"
+
       # -----------------------------
-      # Normalize JSON
+      # Normalize JSON files
       # -----------------------------
       - name: Normalize JSON
         run: |
-          jq -S . qodo.json  > qodo-sorted.json  || true
-          jq -S . metis.json > metis-sorted.json || true
+          jq -S . qodo.json  > qodo-sorted.json  || echo "{}" > qodo-sorted.json
+          jq -S . metis.json > metis-sorted.json || echo "{}" > metis-sorted.json
 
       # -----------------------------
-      # Compare outputs
+      # Diff Output
       # -----------------------------
       - name: Compare Results
         run: |
-          echo "====== DIFF ======"
-          diff qodo-sorted.json metis-sorted.json || true
+          echo "======== DIFF ========"
+          diff -u qodo-sorted.json metis-sorted.json || true
+          echo "========================"
 
       # -----------------------------
       # Upload artifacts
