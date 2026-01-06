@@ -25,6 +25,12 @@ jobs:
           sudo apt-get install -y jq curl python3-pip npm
           pip install --upgrade pip
 
+      # Ensure report files always exist (so artifact upload doesn't fail)
+      - name: Prepare report files
+        run: |
+          echo "[]" > spectral-report.json
+          echo "{}" > schemathesis-report.json
+
       # --------------------
       # Spectral
       # --------------------
@@ -36,18 +42,14 @@ jobs:
       - name: Run Spectral (OpenAPI lint)
         run: |
           spectral lint openapi/dvwa.yaml \
+            --ruleset .spectral.yaml \
             --format json \
             --output spectral-report.json
         continue-on-error: true
 
       # --------------------
-      # Schemathesis
+      # DVWA readiness
       # --------------------
-      - name: Install Schemathesis
-        run: |
-          pip install schemathesis
-          schemathesis --version
-
       - name: Wait for DVWA to be ready
         run: |
           for i in {1..30}; do
@@ -62,17 +64,27 @@ jobs:
           docker ps -a || true
           exit 1
 
+      # --------------------
+      # Schemathesis
+      # --------------------
+      - name: Install Schemathesis
+        run: |
+          pip install schemathesis
+          schemathesis --version
+
       - name: Run Schemathesis (schema-based testing)
         run: |
-          schemathesis run \
-            --schema openapi/dvwa.yaml \
+          schemathesis run openapi/dvwa.yaml \
             --base-url http://localhost \
             --checks all \
-            --hypothesis-max-examples 50 \
+            --max-examples 50 \
             --report json \
             --report-file schemathesis-report.json
         continue-on-error: true
 
+      # --------------------
+      # Upload artifacts
+      # --------------------
       - name: Upload API security reports
         uses: actions/upload-artifact@v4
         with:
