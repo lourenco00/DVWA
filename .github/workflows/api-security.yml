@@ -1,0 +1,84 @@
+name: API Security (OpenAPI-driven)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["master"]
+
+jobs:
+  api-security:
+    runs-on: ubuntu-latest
+
+    services:
+      dvwa:
+        image: vulnerables/web-dvwa
+        ports:
+          - 80:80
+        options: >-
+          --health-cmd="curl -f http://localhost/login.php || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl python3-pip npm
+          pip install --upgrade pip
+
+      # --------------------
+      # Spectral
+      # --------------------
+      - name: Install Spectral
+        run: |
+          npm install -g @stoplight/spectral-cli
+          spectral --version
+
+      - name: Run Spectral (OpenAPI lint)
+        run: |
+          spectral lint openapi/dvwa.yaml \
+            --format json \
+            --output spectral-report.json
+        continue-on-error: true
+
+      # --------------------
+      # Schemathesis
+      # --------------------
+      - name: Install Schemathesis
+        run: |
+          pip install schemathesis
+          schemathesis --version
+
+      - name: Wait for DVWA to be ready
+        run: |
+          for i in {1..10}; do
+            curl -s http://localhost/login.php && break
+            echo "Waiting for DVWA..."
+            sleep 5
+          done
+
+      - name: Run Schemathesis (schema-based testing)
+        run: |
+          schemathesis run \
+            http://localhost \
+            --schema openapi/dvwa.yaml \
+            --checks all \
+            --hypothesis-max-examples 50 \
+            --report json \
+            --report-file schemathesis-report.json
+        continue-on-error: true
+
+      # --------------------
+      # Artifacts
+      # --------------------
+      - name: Upload API security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-security-results
+          path: |
+            spectral-report.json
+            schemathesis-report.json
