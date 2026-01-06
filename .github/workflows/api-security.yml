@@ -25,7 +25,6 @@ jobs:
           sudo apt-get install -y jq curl python3-pip npm
           pip install --upgrade pip
 
-      # Ensure report files always exist (so artifact upload doesn't fail)
       - name: Prepare report files
         run: |
           echo "[]" > spectral-report.json
@@ -75,7 +74,7 @@ jobs:
       - name: Run Schemathesis (schema-based testing)
         run: |
           schemathesis run openapi/dvwa.yaml \
-            --base-url http://localhost \
+            --url http://localhost \
             --checks all \
             --max-examples 50 \
             --report json \
